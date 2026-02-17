@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.7"
+__generated_with = "0.19.2"
 app = marimo.App(width="medium")
 
 
@@ -37,13 +37,13 @@ def _():
     import matplotlib.pyplot as plt #to plot 
     from collections import Counter
     import pandas as pd
-
-    return Counter, json, json_graph, mo, nx, os, pd, plt
+    import altair as alt
+    return Counter, alt, json, json_graph, mo, nx, os, pd, plt
 
 
 @app.cell
 def _(os):
-    os.chdir(r"C:\Users\ilsev\OneDrive\Bureaublad\Uni\Applied data science\Visual data\Group assignment\MC3-data\MC3-data") #set working directionary
+    os.chdir(r"MC3-data") #set working directionary
     return
 
 
@@ -61,7 +61,6 @@ def _(json, json_graph):
     #check nodes & edges
     print("Nodes:", G.number_of_nodes())
     print("Edges:", G.number_of_edges())
-
     return (G,)
 
 
@@ -77,7 +76,6 @@ def _(mo):
 def _(G):
     #check data structure 
     list(G.nodes(data=True))[:5] #check how node looks
-
 
     return
 
@@ -118,7 +116,7 @@ def _(Counter, G, pd, plt):
 
     for i, node_type in enumerate(node_type_order, 1): #loop through each node_type
         subset = df_counts[df_counts["Node Type"] == node_type]
-    
+
         plt.subplot(1, 3, i)
         plt.bar(subset["Subtype"], subset["Count"], color="skyblue")
         plt.title(f"{node_type} Subtype Counts")
@@ -138,7 +136,6 @@ def _(G):
     #check all persons 
     person = [n for n, attrs in G.nodes(data=True) if attrs.get("sub_type") == "Person"]
     print("Persons in the graph (first 10 shown):", person[:10])
-
     return (person,)
 
 
@@ -178,7 +175,6 @@ def _(G, nx, person, plt):
     person_to_explore = person[0]  # change index to explore a different person
     neighbours = explore_person(G, person_to_explore)
     ##okay this is very annoying because you cannot easily change the person_to_explore in marimo, I think this is usually quite helpful in python. Will look how to fix this in marimo, I think there must be an option 
-
     return
 
 
@@ -191,10 +187,10 @@ def _(G, pd):
     for col_node in colleagues_nodes:
         # persons connected to this relationship
         involved_persons = [n for n in G.predecessors(col_node) if G.nodes[n].get("sub_type") == "Person"]
-    
+
         # evidence communications nodes
         evidence_msgs = [n for n in G.predecessors(col_node) if G.nodes[n].get("sub_type") == "Communication"]
-    
+
         rows.append({
             "Colleagues Node": col_node,
             "Persons Involved": ", ".join(involved_persons),
@@ -205,7 +201,6 @@ def _(G, pd):
     df_colleagues = pd.DataFrame(rows) #make df from it 
 
     df_colleagues.head(10) #show dataframe
-
     return
 
 
@@ -266,7 +261,6 @@ def _(node_df):
 
 
 
-
     return event_df, relationship_df
 
 
@@ -276,7 +270,6 @@ def _(event_df):
     print("Events:", event_df.shape)#check N row & columns
     event_df.head() # check first few rows
 
-
     return
 
 
@@ -284,6 +277,96 @@ def _(event_df):
 def _(relationship_df):
     print("Relationships:", relationship_df.shape) #check N row & columns
     relationship_df.head() # check first few rows
+    return
+
+
+@app.cell
+def _(G, pd):
+    from datetime import datetime
+
+    # make a list of communication events, from who to whom and how late
+    temporal_list = []
+
+    for timenode in G.nodes():
+        # find all communication nodes and find their timestamp
+        if G.nodes()[timenode]['sub_type'] == 'Communication':
+            time_stamp = datetime.strptime(G.nodes()[timenode]['timestamp'], "%Y-%m-%d %H:%M:%S")
+
+            # find all the senders and receivers of the communication
+            com_senders = list(G.predecessors(timenode))
+            # also the subtypes of the senders and receivers
+            sender_types = [
+                G.nodes[sender].get("sub_type")
+                for sender in G.predecessors(timenode)
+            ]
+            com_receivers = list(G.successors(timenode))
+            receiver_types = [
+                G.nodes[receiver].get("sub_type")
+                for receiver in G.successors(timenode)
+            ]
+
+            # add info to dataframe
+            temporal_list.append({
+                "ID": timenode,
+                "sender": com_senders,
+                "sender_types": sender_types,
+                "receiver": com_receivers,
+                "receiver_types": receiver_types,
+                "hour": time_stamp.hour,
+                "content": G.nodes()[timenode]['content']
+            })
+
+    temporal_df = pd.DataFrame(temporal_list)
+    temporal_df
+    return (temporal_df,)
+
+
+@app.cell
+def _(G):
+    print(G.predecessors("Sam"))
+    return
+
+
+@app.cell
+def _(alt, temporal_df):
+    alt.Chart(temporal_df).mark_bar().encode(
+        x = alt.X("hour:O"),
+        y = alt.Y("count():Q") 
+    )
+    return
+
+
+@app.cell
+def _(alt, temporal_df):
+    temporal_df_exploded = (
+        temporal_df
+        .explode(["sender", "sender_types"])
+    )
+
+    # plot of communications per hour per subtype of entity
+    alt.Chart(temporal_df_exploded).mark_line().encode(
+        x = alt.X("hour:O"),
+        y = alt.Y("count():Q"),
+        color = alt.Color("sender_types:N")
+    )
+    return
+
+
+@app.cell
+def _(G):
+    print(G.edges(data = True))
+
+    return
+
+
+@app.cell
+def _(G):
+    print(G.nodes(data=True))
+    return
+
+
+@app.cell
+def _():
     return
 
 
